@@ -6,7 +6,7 @@ echo "aptos move compile -->  $DAT3_PATH --bytecode-version 6 "
 echo `aptos move compile    --save-metadata --package-dir  $DAT3_PATH --bytecode-version 6 `
 echo""
 sleep 3
-echo "aptos move publish --> $DAT3_PATH --bytecode-version 6 "
+echo "aptos move publish -->  $DAT3_PATH --bytecode-version 6 "
 echo `aptos move publish --profile test1  --assume-yes --package-dir  $DAT3_PATH --bytecode-version 6 `
 echo""
 sleep 5

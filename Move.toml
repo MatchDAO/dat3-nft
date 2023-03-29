@@ -1,6 +1,6 @@
 [package]
 name = 'DAT3InvitationNft'
-version = '0.0.5'
+version = '0.0.6'
 upgrade_policy = "compatible"
 [dependencies]
 # # https://github.com/aptos-labs/aptos-core.git
