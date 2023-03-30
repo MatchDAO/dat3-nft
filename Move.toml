@@ -1,6 +1,6 @@
 [package]
 name = 'DAT3InvitationNft'
-version = '0.0.6'
+version = '0.0.7'
 upgrade_policy = "compatible"
 [dependencies]
 # # https://github.com/aptos-labs/aptos-core.git
@@ -12,6 +12,6 @@ AptosToken = { local = "../../aptos-core-1.0.4/aptos-move/framework/aptos-token"
 std = "0x1"
 aptos_std = "0x1"
 aptos_framework = "0x1"
-dat3 = "0xba6f578786f2ca745814d72b6240781680d85c1204f2253cbf5ad07ec3ee52a0"
-dat3_admin = "0xfb801e545332e5811534e3bc28a033d0d31a833c14f1df8518b5cdd07bd36dab"
-dat3_nft = "0x124d69858b8003fdd007b3afc303c9cd4e3b96c71eeccc3a7ea2b0b87976f01d"
+dat3 = "0xd8d80db601f7d8bc428c682bf3918806206625813fc634042276d93074615c13"
+dat3_admin = "0x79cb597bf425cfa32166b10a690bb2abdd7d6bedc299941a757ff1de8b74855"
+dat3_nft = "0x12c96e82359f97795a227120fac25d285a8f9ece4e21465cd87a07cf95a0a80e"

@@ -1,5 +1,5 @@
 #!/bin/bash
-DAT3='0xba6f578786f2ca745814d72b6240781680d85c1204f2253cbf5ad07ec3ee52a0'
+DAT3='0xd8d80db601f7d8bc428c682bf3918806206625813fc634042276d93074615c13'
 echo "dat3:' $DAT3'"
 DAT3_PATH=`pwd`
 echo "aptos move compile -->  $DAT3_PATH --bytecode-version 6 "
