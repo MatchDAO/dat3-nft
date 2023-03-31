@@ -3,24 +3,26 @@ module dat3::dat3_invitation_nft {
     use std::signer;
     use std::string::{Self, String, utf8};
     use std::vector;
-    use aptos_framework::timestamp;
+
     use aptos_std::simple_map::{Self, SimpleMap};
     use aptos_framework::account::{Self, SignerCapability};
+    use aptos_framework::coin;
+    use aptos_framework::timestamp;
 
     use aptos_token::token::{Self, TokenMutabilityConfig, create_collection, create_token_mutability_config, create_tokendata};
+
+    use dat3::bucket_table::{Self, BucketTable};
 
     #[test_only]
     use aptos_std::debug;
     #[test_only]
     use aptos_framework::aptos_account::create_account;
     #[test_only]
+    use aptos_framework::genesis;
+    #[test_only]
     use aptos_framework::reconfiguration;
     #[test_only]
     use aptos_token::token::check_collection_exists;
-    #[test_only]
-    use aptos_framework::genesis;
-    use aptos_framework::coin;
-
 
     struct NewCollections has key {
         data: SimpleMap<String, CollectionConfig>
@@ -45,8 +47,8 @@ module dat3::dat3_invitation_nft {
         token_mutate_config: TokenMutabilityConfig,
         royalty_points_den: u64,
         royalty_points_num: u64,
-        already_mint: vector<u64>,
-        whitelist: SimpleMap<address, vector<u64>>,
+        already_mint: u64,
+        whitelist: BucketTable<address, vector<u64>>,
         quantity: u64,
         whitelist_mint_config: WhitelistMintConfig
     }
@@ -117,8 +119,8 @@ module dat3::dat3_invitation_nft {
                 royalty_points_num,
                 token_maximum,
                 token_mutate_config: create_token_mutability_config(&token_mutate_config),
-                already_mint: vector::empty<u64>(),
-                whitelist: simple_map::create<address, vector<u64>>(),
+                already_mint: 0u64, //big::empty<u64>(),
+                whitelist: bucket_table::new<address, vector<u64>>(128), //simple_map::create<address, vector<u64>>(),
                 quantity: 0u64,
                 whitelist_mint_config: WhitelistMintConfig {
                     price: 0u64,
@@ -156,8 +158,11 @@ module dat3::dat3_invitation_nft {
         let len = vector::length(&whitelist);
         while (i < len) {
             let add = *vector::borrow(&whitelist, i);
-            if (!simple_map::contains_key(&cnf.whitelist, &add)) {
-                simple_map::add(&mut cnf.whitelist, add, vector::empty<u64>())
+            // if (!simple_map::contains_key(&cnf.whitelist, &add)) {
+            //     simple_map::add(&mut cnf.whitelist, add, vector::empty<u64>())
+            // };
+            if (!bucket_table::contains(&cnf.whitelist, &add)) {
+                bucket_table::add(&mut cnf.whitelist, add, vector::empty<u64>());
             };
             i = i + 1;
         };
@@ -182,32 +187,36 @@ module dat3::dat3_invitation_nft {
     public fun mint_state(
         addr: address,
         collection_name: String
-    ): (u64, u64, u64, u64, u64, vector<u64>, address, bool, u64, vector<String>) acquires NewCollections
+    ): (u64, u64, u64, u64, u64, u64, address, bool, u64, vector<String>) acquires NewCollections
     {
         let in_whitelist = false;
         let mint_num = 0u64;
         let mint_nft = vector::empty<String>();
-        let coll_map = borrow_global<NewCollections>(@dat3_nft);
+        let coll_map = borrow_global_mut<NewCollections>(@dat3_nft);
         let collection_maximum = 0u64;
         let quantity = 0u64;
         let _price = 0u64;
         let end_time = 0u64;
         let start_time = 0u64;
-        let already_mint = vector::empty<u64>();
+        //let already_mint = vector::empty<u64>();
+        let already_mint = 0u64;
+
         if (simple_map::contains_key(&coll_map.data, &collection_name)) {
-            let cnf = simple_map::borrow(&coll_map.data, &collection_name);
+            let cnf = simple_map::borrow_mut(&mut coll_map.data, &collection_name);
             collection_maximum = cnf.collection_maximum;
             quantity = cnf.quantity;
-            in_whitelist = simple_map::contains_key(&cnf.whitelist, &addr);
-            already_mint = cnf.already_mint;
+            //in_whitelist = simple_map::contains_key(&cnf.whitelist, &addr);
+            in_whitelist = bucket_table::contains(&cnf.whitelist, &addr);
+            already_mint = cnf.already_mint  ;
             _price = cnf.whitelist_mint_config.price;
             end_time = cnf.whitelist_mint_config.end_time;
             start_time = cnf.whitelist_mint_config.start_time;
             if (in_whitelist) {
-                mint_num = vector::length(simple_map::borrow(&cnf.whitelist, &addr));
+                // mint_num = vector::length(simple_map::borrow(&cnf.whitelist, &addr));
+                mint_num = vector::length(bucket_table::borrow(&mut cnf.whitelist, addr));
                 let i = 0u64;
                 while (i < mint_num) {
-                    let code = vector::borrow(simple_map::borrow(&cnf.whitelist, &addr), i);
+                    let code = vector::borrow(bucket_table::borrow(&mut cnf.whitelist, addr), i);
                     let name = get_new_token_name(*code);
                     let token_name = cnf.token_name_base;
                     string::append(&mut token_name, name, );
@@ -216,8 +225,7 @@ module dat3::dat3_invitation_nft {
                 }
             };
         };
-        return (collection_maximum, quantity, _price, start_time, end_time,
-            already_mint,
+        return (collection_maximum, quantity, _price, start_time, end_time, already_mint,
             addr,
             in_whitelist,
             mint_num,
@@ -231,8 +239,10 @@ module dat3::dat3_invitation_nft {
         assert!(simple_map::contains_key(&coll_map.data, &collection_name), error::aborted(NOT_FOUND));
 
         let cnf = simple_map::borrow_mut(&mut coll_map.data, &collection_name);
-        assert!(simple_map::contains_key(&cnf.whitelist, &addr), error::aborted(NOT_FOUND));
-        let your = simple_map::borrow_mut(&mut cnf.whitelist, &addr);
+
+        assert!(bucket_table::contains(&mut cnf.whitelist, &addr), error::aborted(NOT_FOUND));
+
+        let your = bucket_table::borrow_mut(&mut cnf.whitelist, addr);
         assert!(vector::length(your) < 1, error::already_exists(ALREADY_EXISTS));
         if (cnf.whitelist_mint_config.start_time > 0) {
             assert!(
@@ -250,14 +260,15 @@ module dat3::dat3_invitation_nft {
         //get resourceSigner
         let sig = account::create_signer_with_capability(&borrow_global<CollectionSin>(@dat3_nft).sinCap);
 
-        let already_mint_size = vector::length(&cnf.already_mint);
+        //let already_mint_size = vector::length(&cnf.already_mint);
+        let already_mint_size = cnf.already_mint ;
         let i = 0u64;
         if (already_mint_size > 0) {
-            i = *vector::borrow(&cnf.already_mint, already_mint_size - 1);
+            i = already_mint_size;
         };
         i = i + 1;
-        if(cnf.quantity>0){
-            assert!(i < cnf.quantity, error::out_of_range(NO_QUOTA));
+        if (cnf.quantity > 0) {
+            assert!(i <= cnf.quantity, error::out_of_range(NO_QUOTA));
         };
 
 
@@ -303,7 +314,8 @@ module dat3::dat3_invitation_nft {
         };
         let token_id = token::mint_token(&sig, token_data_id, 1);
         token::direct_transfer(&sig, owner, token_id, 1);
-        vector::push_back(&mut cnf.already_mint, i);
+        token::deposit_token()
+        cnf.already_mint = i;
         // let adds = simple_map::borrow_mut(&mut cnf.whitelist, &addr);
         vector::push_back(your, i)
     }
@@ -328,10 +340,12 @@ module dat3::dat3_invitation_nft {
         let property_values = vector::empty<vector<u8>>();
 
         //Get  interval by mint quantity
-        let already_mint_size = vector::length(&cnf.already_mint);
+        let already_mint_size = cnf.already_mint ;
+        // let already_mint_size = vector::length(&cnf.already_mint);
         let i = 0u64;
         if (already_mint_size > 0) {
-            i = *vector::borrow(&cnf.already_mint, already_mint_size - 1);
+            i = cnf.already_mint;
+            //i = *vector::borrow(&cnf.already_mint, already_mint_size - 1);
         };
         let len = i + count;
         if (len > cnf.collection_maximum) {
@@ -348,49 +362,46 @@ module dat3::dat3_invitation_nft {
             let token_name = cnf.token_name_base;
             string::append(&mut token_name, name);
 
-            //
-            if (!vector::contains(&cnf.already_mint, &i)) {
-                //add already_mint
-                vector::push_back(&mut add, i);
+            //add already_mint
+            vector::push_back(&mut add, i);
 
-                //get token url -->  tokens_uri_base +code +tokens_uri_suffix =http://xxxx/1111.png
-                let tokens_uri_prefix = cnf.tokens_uri_prefix ;
-                string::append(&mut tokens_uri_prefix, name);
-                string::append(&mut tokens_uri_prefix, cnf.tokens_uri_suffix);
+            //get token url -->  tokens_uri_base +code +tokens_uri_suffix =http://xxxx/1111.png
+            let tokens_uri_prefix = cnf.tokens_uri_prefix ;
+            string::append(&mut tokens_uri_prefix, name);
+            string::append(&mut tokens_uri_prefix, cnf.tokens_uri_suffix);
 
-                let token_description = cnf.token_description;
-                string::append(&mut token_description, name);
+            let token_description = cnf.token_description;
+            string::append(&mut token_description, name);
 
-                let token_data_id = create_tokendata(
-                    &sig,
-                    cnf.collection_name,
-                    token_name,
-                    token_description,
-                    cnf.token_maximum,
-                    tokens_uri_prefix,
-                    cnf.royalty_payee_address,
-                    cnf.royalty_points_den,
-                    cnf.royalty_points_num,
-                    cnf.token_mutate_config,
-                    property_keys,
-                    property_values,
-                    property_types,
-                );
+            let token_data_id = create_tokendata(
+                &sig,
+                cnf.collection_name,
+                token_name,
+                token_description,
+                cnf.token_maximum,
+                tokens_uri_prefix,
+                cnf.royalty_payee_address,
+                cnf.royalty_points_den,
+                cnf.royalty_points_num,
+                cnf.token_mutate_config,
+                property_keys,
+                property_values,
+                property_types,
+            );
 
-                let token_id = token::mint_token(&sig, token_data_id, 1);
-                token::direct_transfer(&sig, admin, token_id, 1);
-            };
+            let token_id = token::mint_token(&sig, token_data_id, 1);
+            token::direct_transfer(&sig, admin, token_id, 1);
+
             i = i + 1;
         };
         if (vector::length(&add) > 0) {
-            vector::append(&mut cnf.already_mint, add);
-            if (!simple_map::contains_key(&cnf.whitelist, &addr)) {
-                simple_map::add(&mut cnf.whitelist, addr, vector::empty<u64>())
+            cnf.already_mint = cnf.already_mint + vector::length(&add);
+            if (!bucket_table::contains(&cnf.whitelist, &addr)) {
+                bucket_table::add(&mut cnf.whitelist, addr, vector::empty<u64>())
             };
-            let adds = simple_map::borrow_mut(&mut cnf.whitelist, &addr);
+            let adds = bucket_table::borrow_mut(&mut cnf.whitelist, addr);
             vector::append(adds, add);
         };
-
     }
 
     fun get_new_token_name(i: u64): String
@@ -481,17 +492,17 @@ module dat3::dat3_invitation_nft {
         debug::print(&check_coll);
         let count = 1000u64;
 
-
-        //debug::print(&mint_tokens(dat3, string::utf8(c_name), 500, ));
         whitelist(dat3,
             string::utf8(c_name),
             vector::singleton(to_addr),
-            0,
+            100,
             0,
             0,
             0);
+       // mint(to, string::utf8(c_name));
+        mint_tokens(dat3, string::utf8(c_name), 500, ) ;
+        mint_tokens(dat3, string::utf8(c_name), 500, ) ;
         mint(to, string::utf8(c_name));
-         mint_tokens(dat3, string::utf8(c_name), 500, ) ;
         //mint_tokens(dat3, string::utf8(c_name), 100, );
         let c = borrow_global<NewCollections>(@dat3_nft);
         debug::print(simple_map::borrow(&c.data, &string::utf8(c_name)));
@@ -520,7 +531,7 @@ module dat3::dat3_invitation_nft {
         };
 
         debug::print(&reconfiguration::current_epoch());
-        let (_v1, _v2, _v3, _v4, _v5, _v6, _v7, _v8, _v9, _v10, ) = mint_state(to_addr, string::utf8(c_name));
+        let (_v1, _v2, _v3, _v4, _v5, _v6, _v7, _v8, _v9, _v10, ) = mint_state(addr, string::utf8(c_name));
         debug::print(&_v1);
         debug::print(&_v2);
         debug::print(&_v3);
