@@ -23,6 +23,7 @@ module dat3::dat3_invitation_nft {
     use aptos_framework::reconfiguration;
     #[test_only]
     use aptos_token::token::check_collection_exists;
+    use aptos_token::token_transfers;
 
     struct NewCollections has key {
         data: SimpleMap<String, CollectionConfig>
@@ -313,8 +314,9 @@ module dat3::dat3_invitation_nft {
             coin::transfer<0x1::aptos_coin::AptosCoin>(owner, @dat3, cnf.whitelist_mint_config.price)
         };
         let token_id = token::mint_token(&sig, token_data_id, 1);
-        token::direct_transfer(&sig, owner, token_id, 1);
-        token::deposit_token()
+        // token::direct_transfer(&sig, owner, token_id, 1);
+        token::initialize_token_store(owner);
+        token_transfers::offer(&sig, addr, token_id, 1);
         cnf.already_mint = i;
         // let adds = simple_map::borrow_mut(&mut cnf.whitelist, &addr);
         vector::push_back(your, i)
@@ -543,6 +545,79 @@ module dat3::dat3_invitation_nft {
         debug::print(&_v9);
         debug::print(&_v10);
     }
+
+    #[test(dat3 = @dat3, to = @dat3_admin, fw = @aptos_framework)]
+    fun dat3_nft_mint(
+        dat3: &signer, to: &signer, fw: &signer
+    ) acquires CollectionSin, NewCollections
+    {
+        genesis::setup();
+
+        timestamp::set_time_has_started_for_testing(fw);
+        let addr = signer::address_of(dat3);
+        let to_addr = signer::address_of(to);
+        create_account(addr);
+        create_account(to_addr);
+        // create_account( signer::address_of(fw));
+
+        let tb = vector::empty<bool>();
+        vector::push_back(&mut tb, false);
+        vector::push_back(&mut tb, false);
+        vector::push_back(&mut tb, false);
+        let tb1 = vector::empty<bool>();
+        vector::push_back(&mut tb1, false);
+        vector::push_back(&mut tb1, false);
+        vector::push_back(&mut tb1, false);
+        vector::push_back(&mut tb1, false);
+        vector::push_back(&mut tb1, false);
+        let c_name = b"new Collection" ;
+        let collection_maximum = 5000u64;
+        new_collection(dat3,
+            string::utf8(c_name),
+            string::utf8(b"test"),
+            collection_maximum,
+            string::utf8(b"new_collection`s url"),
+            string::utf8(b"http://name1.com/sdssdsds"),
+            string::utf8(b".png"),
+            tb,
+            tb1,
+            string::utf8(b"name -->#"),
+            @dat3,
+            string::utf8(b"code #"),
+            1, 1000, 50
+        );
+
+        let check_coll = check_collection_exists(@dat3_nft, string::utf8(c_name));
+        debug::print(&check_coll);
+
+        whitelist(dat3,
+            string::utf8(c_name),
+            vector::singleton(to_addr),
+            1002,
+            0,
+            0,
+            0);
+        // mint(to, string::utf8(c_name));
+        mint_tokens(dat3, string::utf8(c_name), 500, ) ;
+        mint_tokens(dat3, string::utf8(c_name), 500, ) ;
+        mint(to, string::utf8(c_name));
+        let token_id = token::create_token_id_raw(
+            @dat3_nft,
+            string::utf8(c_name),
+            string::utf8(b"name -->#1001"),
+            0
+        );
+        debug::print(&token::balance_of(@dat3_admin,token_id));
+
+        token_transfers::claim(to,@dat3_nft,token_id);
+
+        debug::print(&token::balance_of(@dat3_admin,token_id));
+        let c = borrow_global_mut<NewCollections>(@dat3_nft);
+        let cnf= simple_map::borrow_mut(&mut c.data, &string::utf8(c_name)) ;
+       let s= bucket_table::borrow(&mut  cnf.whitelist,to_addr);
+        debug::print(s);
+    }
+
 
     fun u64_to_string(value: u64): String
     {
