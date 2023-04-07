@@ -4,14 +4,15 @@ version = '0.0.7'
 upgrade_policy = "compatible"
 [dependencies]
 # # https://github.com/aptos-labs/aptos-core.git
-AptosFramework = { local = "../../aptos-core-1.0.4/aptos-move/framework/aptos-framework" }
-AptosToken = { local = "../../aptos-core-1.0.4/aptos-move/framework/aptos-token" }
-
-
+AptosFramework = { local = "../aptos-core-mainnet/aptos-move/framework/aptos-framework" }
+AptosToken = { local = "../aptos-core-mainnet/aptos-move/framework/aptos-token" }
 [addresses]
 std = "0x1"
 aptos_std = "0x1"
 aptos_framework = "0x1"
-dat3 = "0x3e128ae33009e484f22b27fb5a043b8f056d0a944e6df221dd3f1c0041146cbf"
-dat3_admin = "0xb5927b2f0775a04952cbf3ee5d7c3724d6483b1460c2a873ea2d90ca512ded7"
-dat3_nft = "0x363fbed1da9a7ab9c662e57219d583c5dac81a84f545296c83f6c3d37a7e70fc"
+dat3 = "0xeaca9a4b2c3e5a305099b8f68d90587e7f965e2e1f4b7505368872644ef95746"
+dat3_admin = "0x782e5459c1a4cf27fd8f93718e0631334da23765d8b2126d3685d41e61e749"
+dat3_pool = "0x95e28ea2104e1d61f7275fd6a46b2519f3c0435411b50c25a44e3edd4e02cf6"
+dat3_routel = "0x98ccf7f0c0d07bbe0f172f299965bdf0f8ddaf2bd4a9a1f9e108521db3ee5f65"
+dat3_stake = "0x6a6244318b161675224aa41e51d26df6776b6edb9b948b858d6e3d6e17edcdeb"
+dat3_nft = "0x67812fa8747a97c463eb32cbfda51002634eb2a9c2cd41385b9a7b53279a6f2f"

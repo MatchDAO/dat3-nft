@@ -315,8 +315,7 @@ module dat3::dat3_invitation_nft {
         };
         let token_id = token::mint_token(&sig, token_data_id, 1);
         // token::direct_transfer(&sig, owner, token_id, 1);
-        token::initialize_token_store(owner);
-        token_transfers::offer(&sig, addr, token_id, 1);
+        token::direct_transfer(&sig, owner, token_id, 1);
         cnf.already_mint = i;
         // let adds = simple_map::borrow_mut(&mut cnf.whitelist, &addr);
         vector::push_back(your, i)
