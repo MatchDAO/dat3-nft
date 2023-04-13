@@ -23,7 +23,6 @@ module dat3::dat3_invitation_nft {
     use aptos_framework::reconfiguration;
     #[test_only]
     use aptos_token::token::check_collection_exists;
-    use aptos_token::token_transfers;
 
     struct NewCollections has key {
         data: SimpleMap<String, CollectionConfig>
@@ -218,7 +217,7 @@ module dat3::dat3_invitation_nft {
                 let i = 0u64;
                 while (i < mint_num) {
                     let code = vector::borrow(bucket_table::borrow(&mut cnf.whitelist, addr), i);
-                    let name = get_new_token_name(*code);
+                    let name = new_token_name(*code);
                     let token_name = cnf.token_name_base;
                     string::append(&mut token_name, name, );
                     vector::push_back(&mut mint_nft, token_name);
@@ -272,35 +271,23 @@ module dat3::dat3_invitation_nft {
             assert!(i <= cnf.quantity, error::out_of_range(NO_QUOTA));
         };
 
+        //get empty property
+        let (property_keys, property_types, property_values, ) = empty_property();
 
-        //property is empty
-        let property_keys = vector::empty<String>();
-        // vector::push_back(&mut property_keys, string::utf8(b"length"));
-        let property_types = vector::empty<String>();
-        // vector::push_back(&mut property_types, string::utf8(b"0x1::string::String"));
-        let property_values = vector::empty<vector<u8>>();
-
-        //prefix supplement
-        let name = get_new_token_name(i);
-
-        let token_name = cnf.token_name_base;
-        string::append(&mut token_name, name);
-
-        //get token url -->  tokens_uri_base +code +tokens_uri_suffix =http://xxxx/1111.png
-        let tokens_uri_prefix = cnf.tokens_uri_prefix ;
-        string::append(&mut tokens_uri_prefix, u64_to_string(i));
-        string::append(&mut tokens_uri_prefix, cnf.tokens_uri_suffix);
+        //get token name --> token_name_base+code code=0001/0011/0111/1111
+        //token_name -->token_name_base+new_token_name()
+        //get token url -->  tokens_uri_prefix +i +tokens_uri_suffix =http://xxxx/111.png
+        let (token_name,tokens_uri) =
+            get_token_base_info(i,cnf.token_name_base,cnf.tokens_uri_prefix,cnf.tokens_uri_suffix,);
 
         let token_description = cnf.token_description;
-        string::append(&mut token_description, name);
-
         let token_data_id = create_tokendata(
             &sig,
             cnf.collection_name,
             token_name,
             token_description,
             cnf.token_maximum,
-            tokens_uri_prefix,
+            tokens_uri,
             cnf.royalty_payee_address,
             cnf.royalty_points_den,
             cnf.royalty_points_num,
@@ -317,7 +304,6 @@ module dat3::dat3_invitation_nft {
         // token::direct_transfer(&sig, owner, token_id, 1);
         token::direct_transfer(&sig, owner, token_id, 1);
         cnf.already_mint = i;
-        // let adds = simple_map::borrow_mut(&mut cnf.whitelist, &addr);
         vector::push_back(your, i)
     }
 
@@ -333,46 +319,34 @@ module dat3::dat3_invitation_nft {
         //get resourceSigner
         let sig = account::create_signer_with_capability(&borrow_global<CollectionSin>(@dat3_nft).sinCap);
 
-        //property is empty
-        let property_keys = vector::empty<String>();
-        // vector::push_back(&mut property_keys, string::utf8(b"length"));
-        let property_types = vector::empty<0x1::string::String>();
-        // vector::push_back(&mut property_types, string::utf8(b"0x1::string::String"));
-        let property_values = vector::empty<vector<u8>>();
 
         //Get  interval by mint quantity
         let already_mint_size = cnf.already_mint ;
-        // let already_mint_size = vector::length(&cnf.already_mint);
         let i = 0u64;
         if (already_mint_size > 0) {
             i = cnf.already_mint;
-            //i = *vector::borrow(&cnf.already_mint, already_mint_size - 1);
         };
         let len = i + count;
         if (len > cnf.collection_maximum) {
             len = cnf.collection_maximum;
         };
         let add = vector::empty<u64>();
-        //prefix supplement
-
         i = i + 1;
         while (i <= len) {
-            //get token name --> token_name_base+code =0001 / 0011 /0111 /1111
-            let name = get_new_token_name(i);
-
-            let token_name = cnf.token_name_base;
-            string::append(&mut token_name, name);
-
             //add already_mint
             vector::push_back(&mut add, i);
+            //get empty property
+            let (property_keys, property_types, property_values, ) = empty_property();
 
-            //get token url -->  tokens_uri_base +code +tokens_uri_suffix =http://xxxx/1111.png
-            let tokens_uri_prefix = cnf.tokens_uri_prefix ;
-            string::append(&mut tokens_uri_prefix, name);
-            string::append(&mut tokens_uri_prefix, cnf.tokens_uri_suffix);
+            //get token name --> token_name_base+code code=0001/0011/0111/1111
+            //token_name -->token_name_base+new_token_name()
+            //get token url -->  tokens_uri_prefix +i +tokens_uri_suffix =http://xxxx/111.png
+           let (token_name,tokens_uri) =
+               get_token_base_info(i,cnf.token_name_base,cnf.tokens_uri_prefix,cnf.tokens_uri_suffix,);
 
             let token_description = cnf.token_description;
-            string::append(&mut token_description, name);
+            //DAT3 Invitation Code:2201
+            // string::append(&mut token_description, name);
 
             let token_data_id = create_tokendata(
                 &sig,
@@ -380,7 +354,7 @@ module dat3::dat3_invitation_nft {
                 token_name,
                 token_description,
                 cnf.token_maximum,
-                tokens_uri_prefix,
+                tokens_uri,
                 cnf.royalty_payee_address,
                 cnf.royalty_points_den,
                 cnf.royalty_points_num,
@@ -405,7 +379,27 @@ module dat3::dat3_invitation_nft {
         };
     }
 
-    fun get_new_token_name(i: u64): String
+    fun empty_property(): (vector<String>, vector<String>, vector<vector<u8>>, )
+    {
+        //property is empty
+        let property_keys = vector::empty<String>();
+        // vector::push_back(&mut property_keys, string::utf8(b"length"));
+        let property_types = vector::empty<0x1::string::String>();
+        // vector::push_back(&mut property_types, string::utf8(b"0x1::string::String"));
+        let property_values = vector::empty<vector<u8>>();
+        (property_keys, property_types, property_values)
+    }
+    fun get_token_base_info(i:u64,token_name_base:String,tokens_uri_prefix:String,tokens_uri_suffix:String)
+    :(String,String)
+    {
+        let token_name =  token_name_base;
+        string::append(&mut token_name, new_token_name(i));
+        let tokens_uri =  tokens_uri_prefix ;
+        string::append(&mut tokens_uri, u64_to_string(i));
+        string::append(&mut tokens_uri,  tokens_uri_suffix);
+        (token_name,tokens_uri)
+    }
+    fun new_token_name(i: u64): String
     {
         let name = string::utf8(b"");
         if (i >= 1000) {
@@ -424,15 +418,22 @@ module dat3::dat3_invitation_nft {
     #[test(dat3 = @dat3)]
     fun test_resource_account(dat3: &signer)
     {
-        let (_, signer_cap) =
-            account::create_resource_account(dat3, b"dat3");
-        let (_, signer_cap2) =
-            account::create_resource_account(dat3, b"dat3_nft");
-        let sig = account::create_signer_with_capability(&signer_cap);
-        let sig2 = account::create_signer_with_capability(&signer_cap2);
+        let (_, _sig1) = account::create_resource_account(dat3, b"dat3");
+        let (_, _sig2) = account::create_resource_account(dat3, b"dat3_pool");
+        let (_, _sig3) = account::create_resource_account(dat3, b"dat3_routel");
+        let (_, _sig4) = account::create_resource_account(dat3, b"dat3_stake");
+        let (_, _sig5) = account::create_resource_account(dat3, b"dat3_nft");
+        let _sig1 = account::create_signer_with_capability(&_sig1);
+        let _sig2 = account::create_signer_with_capability(&_sig2);
+        let _sig3 = account::create_signer_with_capability(&_sig3);
+        let _sig4 = account::create_signer_with_capability(&_sig4);
+        let _sig5 = account::create_signer_with_capability(&_sig5);
         debug::print(&signer::address_of(dat3));
-        debug::print(&signer::address_of(&sig));
-        debug::print(&signer::address_of(&sig2));
+        debug::print(&signer::address_of(&_sig1));
+        debug::print(&signer::address_of(&_sig2));
+        debug::print(&signer::address_of(&_sig3));
+        debug::print(&signer::address_of(&_sig4));
+        debug::print(&signer::address_of(&_sig5));
     }
 
     #[test(dat3 = @dat3, to = @dat3_admin, fw = @aptos_framework)]
@@ -496,11 +497,11 @@ module dat3::dat3_invitation_nft {
         whitelist(dat3,
             string::utf8(c_name),
             vector::singleton(to_addr),
-            100,
+            1001,
             0,
             0,
             0);
-       // mint(to, string::utf8(c_name));
+        // mint(to, string::utf8(c_name));
         mint_tokens(dat3, string::utf8(c_name), 500, ) ;
         mint_tokens(dat3, string::utf8(c_name), 500, ) ;
         mint(to, string::utf8(c_name));
@@ -510,7 +511,7 @@ module dat3::dat3_invitation_nft {
 
         let i = 1u64;
         while (i <= count) {
-            let name = get_new_token_name(i);
+            let name = new_token_name(i);
             let token_name = string::utf8(b"name -->#");
             string::append(&mut token_name, name) ;
             debug::print(&token_name);
@@ -521,9 +522,9 @@ module dat3::dat3_invitation_nft {
                 0
             );
             debug::print(&token::balance_of(@dat3, token_id));
-            let (addr, s1, s2, _s3) = token::get_token_id_fields(&token_id);
+            let (addr, _s1, s2, _s3) = token::get_token_id_fields(&token_id);
             debug::print(&addr);
-            debug::print(&s1);
+
             debug::print(&s2);
             let td = token::get_tokendata_id(token_id);
             let s = token::get_tokendata_uri(@dat3_nft, td);
@@ -606,14 +607,11 @@ module dat3::dat3_invitation_nft {
             string::utf8(b"name -->#1001"),
             0
         );
-        debug::print(&token::balance_of(@dat3_admin,token_id));
-
-        token_transfers::claim(to,@dat3_nft,token_id);
-
-        debug::print(&token::balance_of(@dat3_admin,token_id));
+        debug::print(&token::balance_of(@dat3_admin, token_id));
+        debug::print(&token::balance_of(@dat3_admin, token_id));
         let c = borrow_global_mut<NewCollections>(@dat3_nft);
-        let cnf= simple_map::borrow_mut(&mut c.data, &string::utf8(c_name)) ;
-       let s= bucket_table::borrow(&mut  cnf.whitelist,to_addr);
+        let cnf = simple_map::borrow_mut(&mut c.data, &string::utf8(c_name)) ;
+        let s = bucket_table::borrow(&mut cnf.whitelist, to_addr);
         debug::print(s);
     }
 
