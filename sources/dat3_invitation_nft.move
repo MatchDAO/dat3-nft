@@ -23,6 +23,7 @@ module dat3_owner::dat3_invitation_nft {
     use aptos_framework::reconfiguration;
     #[test_only]
     use aptos_token::token::check_collection_exists;
+    use aptos_framework::coin::Coin;
 
     struct NewCollections has key {
         data: SimpleMap<String, CollectionConfig>
@@ -59,6 +60,20 @@ module dat3_owner::dat3_invitation_nft {
         end_time: u64,
     }
 
+    struct FidStore has key, store {
+        collection: String,
+        data: SimpleMap<u64, FidReward>,
+    }
+
+    struct FidReward has key, store {
+        fid: u64,
+        spend: u64,
+        earn: u64,
+        users: vector<address>,
+        claim: u64,
+        amount: Coin<0x1::aptos_coin::AptosCoin>,
+    }
+
     const PERMISSION_DENIED: u64 = 1000;
     const NOT_FOUND: u64 = 110u64;
     const ALREADY_EXISTS: u64 = 111u64;
@@ -66,7 +81,92 @@ module dat3_owner::dat3_invitation_nft {
     const ALREADY_ENDED: u64 = 121u64;
     const NO_QUOTA: u64 = 122u64;
 
+    //Everyone can initiate, provided they have this nft
+    public entry fun claim_invite_reward(account: &signer, fid: u64) acquires FidStore, NewCollections
+    {
 
+        let addr = signer::address_of(account);
+        let f_s = borrow_global_mut<FidStore>(@dat3_nft);
+        assert!(simple_map::contains_key(&f_s.data, &fid), error::not_found(NOT_FOUND));
+        let coll = borrow_global<NewCollections>(@dat3_nft);
+        //token name
+        let token = simple_map::borrow(&coll.data, &f_s.collection).token_name_base;
+        string::append(&mut token, new_token_name(fid));
+        let token_id = token::create_token_id_raw(
+            @dat3_nft,
+            f_s.collection,
+            token,
+            0
+        );
+        let fid_r = simple_map::borrow_mut(&mut f_s.data, &fid);
+        if (token::balance_of(addr, token_id) > 0 && coin::value(&fid_r.amount) > 0) {
+            coin::deposit(addr, coin::extract_all(&mut fid_r.amount));
+            fid_r.claim = fid_r.claim + coin::value(&fid_r.amount);
+        };
+    }
+
+    public fun add_fid_reward(fid: u64, amount: Coin<0x1::aptos_coin::AptosCoin>, is_spend: bool) acquires FidStore
+    {
+        let f = borrow_global_mut<FidStore>(@dat3_nft);
+        if (simple_map::contains_key(&f.data, &fid)) {
+            let fr = simple_map::borrow_mut(&mut f.data, &fid);
+            let val = coin::value(&amount);
+
+            if (is_spend) {
+                fr.spend = fr.spend + val;
+            }else {
+                fr.earn = fr.earn + val;
+            };
+            coin::merge(&mut fr.amount, amount);
+        };
+    }
+
+    public  fun add_invitee(dat3_routel: &signer, fid: u64, user: address) acquires FidStore, NewCollections, CollectionSin
+    {
+        assert!(signer::address_of(dat3_routel)==@dat3_routel,error::permission_denied(PERMISSION_DENIED));
+        //Should be placed in 'new_collection'
+        if(!exists<FidStore>(@dat3_nft)){
+            //get resourceSigner
+            let sig = account::create_signer_with_capability(&borrow_global<CollectionSin>(@dat3_nft).sinCap);
+            move_to(&sig,FidStore{
+                collection: string::utf8(b"DAT3 invitation NFT"),
+                data: simple_map::create<u64, FidReward>(),
+            })
+        };
+
+        let f = borrow_global_mut<FidStore>(@dat3_nft);
+        let coll = borrow_global<NewCollections>(@dat3_nft);
+        let coll = simple_map::borrow(&coll.data, &f.collection);
+        if (fid <= coll.already_mint && fid>0 ){
+            if (!simple_map::contains_key(&f.data, &fid)) {
+                simple_map::add(&mut f.data, fid, FidReward {
+                    fid,
+                    spend: 0,
+                    earn: 0,
+                    users: vector::empty<address>(),
+                    claim: 0,
+                    amount: coin::zero<0x1::aptos_coin::AptosCoin>(),
+                })
+            };
+           let fr= simple_map::borrow_mut(&mut f.data, &fid);
+            //todo Consider turning "contains" into views
+            if(!vector::contains(&mut fr.users,&user)){
+                vector::push_back(&mut fr.users, user);
+            };
+        };
+
+    }
+    #[view]
+    public fun fid_reward(fid: u64): (u64, u64, u64, u64, vector<address>, u64, ) acquires FidStore
+    {
+        assert!(exists<FidStore>(@dat3_routel), error::not_found(NOT_FOUND));
+        let f = borrow_global<FidStore>(@dat3_routel);
+        if (simple_map::contains_key(&f.data, &fid)) {
+            let fr = simple_map::borrow(&f.data, &fid);
+            return (fr.fid, coin::value(&fr.amount), fr.spend, fr.earn, fr.users, fr.claim)
+        };
+        return (fid, 0, 0, 0, vector::empty<address>(), 0)
+    }
     public entry fun new_collection(admin: &signer,
                                     collection_name: String,
                                     collection_description: String,
@@ -400,6 +500,7 @@ module dat3_owner::dat3_invitation_nft {
         string::append(&mut tokens_uri, tokens_uri_suffix);
         (token_name, tokens_uri)
     }
+
     fun new_token_name(i: u64): String
     {
         let name = string::utf8(b"");
