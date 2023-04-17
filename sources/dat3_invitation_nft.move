@@ -105,20 +105,26 @@ module dat3_owner::dat3_invitation_nft {
         };
     }
 
-    public fun add_fid_reward(fid: u64, amount: Coin<0x1::aptos_coin::AptosCoin>, is_spend: bool) acquires FidStore
+    public fun invitation_reward(
+        dat3_routel: &signer,
+        fid: u64,
+        amount: Coin<0x1::aptos_coin::AptosCoin>,
+        is_spend: bool
+    ) acquires FidStore
     {
+        //Only the dat3_routel resource account is allowed to access
+        assert!(signer::address_of(dat3_routel) == @dat3_routel, error::permission_denied(PERMISSION_DENIED));
         let f = borrow_global_mut<FidStore>(@dat3_nft);
-        if (simple_map::contains_key(&f.data, &fid)) {
-            let fr = simple_map::borrow_mut(&mut f.data, &fid);
-            let val = coin::value(&amount);
-
-            if (is_spend) {
-                fr.spend = fr.spend + val;
-            }else {
-                fr.earn = fr.earn + val;
-            };
-            coin::merge(&mut fr.amount, amount);
+        //aborted transaction,coins are safe
+        assert!(simple_map::contains_key(&f.data, &fid), error::not_found(NOT_FOUND));
+        let fr = simple_map::borrow_mut(&mut f.data, &fid);
+        let val = coin::value(&amount);
+        if (is_spend) {
+            fr.spend = fr.spend + val;
+        }else {
+            fr.earn = fr.earn + val;
         };
+        coin::merge(&mut fr.amount, amount);
     }
 
     public fun add_invitee(
@@ -141,7 +147,7 @@ module dat3_owner::dat3_invitation_nft {
         let f = borrow_global_mut<FidStore>(@dat3_nft);
         let coll = borrow_global<NewCollections>(@dat3_nft);
         let coll = simple_map::borrow(&coll.data, &f.collection);
-        if (fid <= coll.already_mint && fid > 0) {
+        assert!(fid <= coll.already_mint && fid > 0,error::invalid_argument());
             if (!simple_map::contains_key(&f.data, &fid)) {
                 simple_map::add(&mut f.data, fid, FidReward {
                     fid,
@@ -157,7 +163,7 @@ module dat3_owner::dat3_invitation_nft {
             if (!vector::contains(&mut fr.users, &user)) {
                 vector::push_back(&mut fr.users, user);
             };
-        };
+
     }
 
     #[view]
@@ -291,7 +297,7 @@ module dat3_owner::dat3_invitation_nft {
             i = i + 1;
         };
 
-        if (quantity > 0 && quantity < = cnf.collection_maximum) {
+        if (quantity > 0 && quantity <= cnf.collection_maximum) {
             cnf.quantity = quantity;
         };
         if (whitelist_mint_price > 0) {
@@ -409,7 +415,7 @@ module dat3_owner::dat3_invitation_nft {
         };
         i = i + 1;
         if (cnf.quantity > 0) {
-            assert!(i < = cnf.quantity, error::out_of_range(NO_QUOTA));
+            assert!(i <= cnf.quantity, error::out_of_range(NO_QUOTA));
         };
 
         //get empty property
@@ -477,7 +483,7 @@ module dat3_owner::dat3_invitation_nft {
         };
         let add = vector::empty<u64>();
         i = i + 1;
-        while (i < = len) {
+        while (i <= len) {
             //add already_mint
             vector::push_back(&mut add, i);
             //get empty property
@@ -560,9 +566,9 @@ module dat3_owner::dat3_invitation_nft {
         let name = string::utf8(b"");
         if (i >= 1000) {
             name = string::utf8(b"");
-        } else if (100 < = i && i < 1000) {
+        } else if (100 <= i && i < 1000) {
             name = string::utf8(b"0");
-        } else if (10 < = i && i < 100) {
+        } else if (10 <= i && i < 100) {
             name = string::utf8(b"00");
         } else if (i < 10) {
             name = string::utf8(b"000");
@@ -672,7 +678,7 @@ module dat3_owner::dat3_invitation_nft {
         debug::print(simple_map::borrow(&c.data, &string::utf8(c_name)));
 
         let i = 1u64;
-        while (i < = count) {
+        while (i <= count) {
             let name = new_token_name(i);
             let token_name = string::utf8(b"name -->#");
             string::append(&mut token_name, name) ;
