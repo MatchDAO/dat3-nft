@@ -121,14 +121,18 @@ module dat3_owner::dat3_invitation_nft {
         };
     }
 
-    public  fun add_invitee(dat3_routel: &signer, fid: u64, user: address) acquires FidStore, NewCollections, CollectionSin
+    public fun add_invitee(
+        dat3_routel: &signer,
+        fid: u64,
+        user: address
+    ) acquires FidStore, NewCollections, CollectionSin
     {
-        assert!(signer::address_of(dat3_routel)==@dat3_routel,error::permission_denied(PERMISSION_DENIED));
+        assert!(signer::address_of(dat3_routel) == @dat3_routel, error::permission_denied(PERMISSION_DENIED));
         //Should be placed in 'new_collection'
-        if(!exists<FidStore>(@dat3_nft)){
+        if (!exists<FidStore>(@dat3_nft)) {
             //get resourceSigner
             let sig = account::create_signer_with_capability(&borrow_global<CollectionSin>(@dat3_nft).sinCap);
-            move_to(&sig,FidStore{
+            move_to(&sig, FidStore {
                 collection: string::utf8(b"DAT3 invitation NFT"),
                 data: simple_map::create<u64, FidReward>(),
             })
@@ -137,7 +141,7 @@ module dat3_owner::dat3_invitation_nft {
         let f = borrow_global_mut<FidStore>(@dat3_nft);
         let coll = borrow_global<NewCollections>(@dat3_nft);
         let coll = simple_map::borrow(&coll.data, &f.collection);
-        if (fid <= coll.already_mint && fid>0 ){
+        if (fid <= coll.already_mint && fid > 0) {
             if (!simple_map::contains_key(&f.data, &fid)) {
                 simple_map::add(&mut f.data, fid, FidReward {
                     fid,
@@ -148,14 +152,14 @@ module dat3_owner::dat3_invitation_nft {
                     amount: coin::zero<0x1::aptos_coin::AptosCoin>(),
                 })
             };
-           let fr= simple_map::borrow_mut(&mut f.data, &fid);
+            let fr = simple_map::borrow_mut(&mut f.data, &fid);
             //todo Consider turning "contains" into views
-            if(!vector::contains(&mut fr.users,&user)){
+            if (!vector::contains(&mut fr.users, &user)) {
                 vector::push_back(&mut fr.users, user);
             };
         };
-
     }
+
     #[view]
     public fun fid_reward(fid: u64): (u64, u64, u64, u64, vector<address>, u64, ) acquires FidStore
     {
@@ -167,6 +171,21 @@ module dat3_owner::dat3_invitation_nft {
         };
         return (fid, 0, 0, 0, vector::empty<address>(), 0)
     }
+
+    #[view]
+    public fun is_invitee(fid: u64, user: address): (u64) acquires FidStore
+    {
+        assert!(exists<FidStore>(@dat3_routel), error::not_found(NOT_FOUND));
+        let f = borrow_global<FidStore>(@dat3_routel);
+        if (simple_map::contains_key(&f.data, &fid)) {
+            if (vector::contains(&simple_map::borrow(&f.data, &fid).users, &user)) {
+                return 1
+            };
+            return 2
+        } ;
+        return 3
+    }
+
     public entry fun new_collection(admin: &signer,
                                     collection_name: String,
                                     collection_description: String,
@@ -181,7 +200,9 @@ module dat3_owner::dat3_invitation_nft {
                                     token_description: String,
                                     token_maximum: u64,
                                     royalty_points_den: u64,
-                                    royalty_points_num: u64, ) acquires CollectionSin, NewCollections
+                                    royalty_points_num: u64, ) acquires
+    CollectionSin,
+    NewCollections
     {
         let addr = signer::address_of(admin);
         assert!(addr == @dat3_owner, error::permission_denied(PERMISSION_DENIED));
@@ -239,7 +260,9 @@ module dat3_owner::dat3_invitation_nft {
         };
     }
 
-    public entry fun whitelist(
+    public
+    entry fun
+    whitelist(
         owner: &signer,
         collection_name: String,
         whitelist: vector<address>,
@@ -247,7 +270,8 @@ module dat3_owner::dat3_invitation_nft {
         whitelist_mint_price: u64,
         whitelist_minting_start_time: u64,
         whitelist_minting_end_time: u64,
-    ) acquires NewCollections
+    ) acquires
+    NewCollections
     {
         let addr = signer::address_of(owner);
         assert!(addr == @dat3_owner, error::aborted(NOT_FOUND));
@@ -267,7 +291,7 @@ module dat3_owner::dat3_invitation_nft {
             i = i + 1;
         };
 
-        if (quantity > 0 && quantity <= cnf.collection_maximum) {
+        if (quantity > 0 && quantity < = cnf.collection_maximum) {
             cnf.quantity = quantity;
         };
         if (whitelist_mint_price > 0) {
@@ -283,11 +307,24 @@ module dat3_owner::dat3_invitation_nft {
         };
     }
 
-    #[view]
-    public fun mint_state(
+    #[
+    view]
+    public fun
+    mint_state(
         addr: address,
         collection_name: String
-    ): (u64, u64, u64, u64, u64, u64, address, bool, u64, vector<String>) acquires NewCollections
+    ): (
+        u64,
+        u64,
+        u64,
+        u64,
+        u64,
+        u64,
+        address,
+        bool,
+        u64,
+        vector<String>) acquires
+    NewCollections
     {
         let in_whitelist = false;
         let mint_num = 0u64;
@@ -333,7 +370,11 @@ module dat3_owner::dat3_invitation_nft {
     }
 
 
-    public entry fun mint(owner: &signer, collection_name: String) acquires NewCollections, CollectionSin {
+    public
+    entry fun
+    mint(owner: &signer, collection_name: String) acquires
+    NewCollections,
+    CollectionSin {
         let addr = signer::address_of(owner);
         let coll_map = borrow_global_mut<NewCollections>(@dat3_nft);
         assert!(simple_map::contains_key(&coll_map.data, &collection_name), error::aborted(NOT_FOUND));
@@ -368,7 +409,7 @@ module dat3_owner::dat3_invitation_nft {
         };
         i = i + 1;
         if (cnf.quantity > 0) {
-            assert!(i <= cnf.quantity, error::out_of_range(NO_QUOTA));
+            assert!(i < = cnf.quantity, error::out_of_range(NO_QUOTA));
         };
 
         //get empty property
@@ -408,8 +449,12 @@ module dat3_owner::dat3_invitation_nft {
     }
 
 
-    public entry fun mint_tokens(admin: &signer, collection_name: String, count: u64)
-    acquires NewCollections, CollectionSin
+    public
+    entry fun
+    mint_tokens(admin: &signer, collection_name: String, count: u64)
+    acquires
+    NewCollections,
+    CollectionSin
     {
         let addr = signer::address_of(admin);
         assert!(addr == @dat3_owner, error::permission_denied(PERMISSION_DENIED));
@@ -432,7 +477,7 @@ module dat3_owner::dat3_invitation_nft {
         };
         let add = vector::empty<u64>();
         i = i + 1;
-        while (i <= len) {
+        while (i < = len) {
             //add already_mint
             vector::push_back(&mut add, i);
             //get empty property
@@ -479,7 +524,11 @@ module dat3_owner::dat3_invitation_nft {
         };
     }
 
-    fun empty_property(): (vector<String>, vector<String>, vector<vector<u8>>, )
+    fun
+    empty_property(): (
+        vector<String>,
+        vector<String>,
+        vector<vector<u8>>, )
     {
         //property is empty
         let property_keys = vector::empty<String>();
@@ -490,8 +539,11 @@ module dat3_owner::dat3_invitation_nft {
         (property_keys, property_types, property_values)
     }
 
-    fun get_token_base_info(i: u64, token_name_base: String, tokens_uri_prefix: String, tokens_uri_suffix: String)
-    : (String, String)
+    fun
+    get_token_base_info(i: u64, token_name_base: String, tokens_uri_prefix: String, tokens_uri_suffix: String)
+    : (
+        String,
+        String)
     {
         let token_name = token_name_base;
         string::append(&mut token_name, new_token_name(i));
@@ -501,24 +553,28 @@ module dat3_owner::dat3_invitation_nft {
         (token_name, tokens_uri)
     }
 
-    fun new_token_name(i: u64): String
+    fun
+    new_token_name(i: u64):
+    String
     {
         let name = string::utf8(b"");
         if (i >= 1000) {
             name = string::utf8(b"");
-        }else if (100 <= i && i < 1000) {
+        } else if (100 < = i && i < 1000) {
             name = string::utf8(b"0");
-        } else if (10 <= i && i < 100) {
+        } else if (10 < = i && i < 100) {
             name = string::utf8(b"00");
-        }else if (i < 10) {
+        } else if (i < 10) {
             name = string::utf8(b"000");
         };
         string::append(&mut name, u64_to_string(i));
         name
     }
 
-    #[test(dat3 = @dat3_owner)]
-    fun test_resource_account(dat3: &signer)
+    #[
+    test(dat3 = @dat3_owner)]
+    fun
+    test_resource_account(dat3: &signer)
     {
         let (_, _sig1) = account::create_resource_account(dat3, b"dat3_v1");
         let (_, _sig2) = account::create_resource_account(dat3, b"dat3_pool_v1");
@@ -538,10 +594,14 @@ module dat3_owner::dat3_invitation_nft {
         debug::print(&signer::address_of(&_sig5));
     }
 
-    #[test(dat3 = @dat3_owner, to = @dat3_nft, fw = @aptos_framework)]
-    fun dat3_nft_init(
+    #[
+    test(dat3 = @dat3_owner, to = @dat3_nft, fw = @aptos_framework)]
+    fun
+    dat3_nft_init(
         dat3: &signer, to: &signer, fw: &signer
-    ) acquires CollectionSin, NewCollections
+    ) acquires
+    CollectionSin,
+    NewCollections
     {
         genesis::setup();
 
@@ -612,7 +672,7 @@ module dat3_owner::dat3_invitation_nft {
         debug::print(simple_map::borrow(&c.data, &string::utf8(c_name)));
 
         let i = 1u64;
-        while (i <= count) {
+        while (i < = count) {
             let name = new_token_name(i);
             let token_name = string::utf8(b"name -->#");
             string::append(&mut token_name, name) ;
@@ -648,10 +708,14 @@ module dat3_owner::dat3_invitation_nft {
         debug::print(&_v10);
     }
 
-    #[test(dat3 = @dat3_owner, to = @dat3_nft, fw = @aptos_framework)]
-    fun dat3_nft_mint(
+    #[
+    test(dat3 = @dat3_owner, to = @dat3_nft, fw = @aptos_framework)]
+    fun
+    dat3_nft_mint(
         dat3: &signer, to: &signer, fw: &signer
-    ) acquires CollectionSin, NewCollections
+    ) acquires
+    CollectionSin,
+    NewCollections
     {
         genesis::setup();
 
@@ -718,7 +782,9 @@ module dat3_owner::dat3_invitation_nft {
     }
 
 
-    fun u64_to_string(value: u64): String
+    fun
+    u64_to_string(value: u64):
+    String
     {
         if (value == 0) {
             return utf8(b"0")
