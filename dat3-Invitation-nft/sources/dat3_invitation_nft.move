@@ -455,10 +455,8 @@ module dat3_owner::dat3_invitation_nft {
         debug::print(&signer::address_of(&_sig5));
     }
 
-    #[
-    test(dat3 = @dat3_owner, to = @dat3_nft, fw = @aptos_framework)]
-    fun
-    dat3_nft_init(
+    #[test(dat3 = @dat3_owner, to = @dat3_nft, fw = @aptos_framework)]
+    fun dat3_nft_init(
         dat3: &signer, to: &signer, fw: &signer
     ) acquires
     CollectionSin, CollectionConfig
@@ -523,8 +521,8 @@ module dat3_owner::dat3_invitation_nft {
             0,
             0);
         // mint(to, string::utf8(c_name));
-        mint_tokens(dat3, string::utf8(c_name), 500, ) ;
-        mint_tokens(dat3, string::utf8(c_name), 500, ) ;
+        mint_tokens(dat3,   500, ) ;
+        mint_tokens(dat3,   500, ) ;
         mint(to);
         //mint_tokens(dat3, string::utf8(c_name), 100, );
         let c = borrow_global<CollectionConfig>(@dat3_nft);
@@ -566,8 +564,7 @@ module dat3_owner::dat3_invitation_nft {
     }
 
     #[test(dat3 = @dat3_owner, to = @dat3_nft, fw = @aptos_framework)]
-    fun
-    dat3_nft_mint(
+    fun dat3_nft_mint(
         dat3: &signer, to: &signer, fw: &signer
     ) acquires
     CollectionSin, CollectionConfig
@@ -618,8 +615,8 @@ module dat3_owner::dat3_invitation_nft {
             0,
             0);
         // mint(to, string::utf8(c_name));
-        mint_tokens(dat3, string::utf8(c_name), 500, ) ;
-        mint_tokens(dat3, string::utf8(c_name), 500, ) ;
+        mint_tokens(dat3,   500, ) ;
+        mint_tokens(dat3,   500, ) ;
         mint(to);
         let token_id = token::create_token_id_raw(
             @dat3_nft,
@@ -634,8 +631,8 @@ module dat3_owner::dat3_invitation_nft {
     }
 
 
-    fun u64_to_string(value: u64):
-    String
+    fun u64_to_string(value: u64)
+    : String
     {
         if (value == 0) {
             return utf8(b"0")

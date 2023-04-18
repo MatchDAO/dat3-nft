@@ -11,9 +11,10 @@ module dat3_owner::invitation_reward {
     use aptos_token::token;
     use dat3_owner::dat3_invitation_nft;
     use aptos_framework::account::SignerCapability;
+    use dat3_owner::bucket_table;
+    use dat3_owner::bucket_table::BucketTable;
 
     struct FidStore has key, store {
-        collection: String,
         data: SimpleMap<u64, FidReward>,
     }
 
@@ -24,6 +25,10 @@ module dat3_owner::invitation_reward {
         users: vector<address>,
         claim: u64,
         amount: Coin<0x1::aptos_coin::AptosCoin>,
+    }
+
+    struct CheckInvitees has key, store {
+        users: BucketTable<address, u64>,
     }
 
     struct FidRewardSin has key {
@@ -62,14 +67,14 @@ module dat3_owner::invitation_reward {
     }
 
     public fun invitation_reward(
-        dat3_routel: &signer,
+        dat3_reward: &signer,
         fid: u64,
         amount: Coin<0x1::aptos_coin::AptosCoin>,
         is_spend: bool
     ) acquires FidStore
     {
         //Only the dat3_routel resource account is allowed to access
-        assert!(signer::address_of(dat3_routel) == @dat3_routel, error::permission_denied(PERMISSION_DENIED));
+        assert!(signer::address_of(dat3_reward) == @dat3_reward, error::permission_denied(PERMISSION_DENIED));
         let f = borrow_global_mut<FidStore>(@dat3_nft_reward);
         //aborted transaction,coins are safe
         assert!(simple_map::contains_key(&f.data, &fid), error::not_found(NOT_FOUND));
@@ -90,14 +95,13 @@ module dat3_owner::invitation_reward {
                 let (resourceSigner, sinCap) = account::create_resource_account(dat3_owner, b"dat3_nft_reward_v1");
                 move_to(&resourceSigner, FidRewardSin { sinCap });
             };
-            dat3_invitation_nft::collection_config();
             let sig = account::create_signer_with_capability(&borrow_global<FidRewardSin>(@dat3_nft_reward).sinCap);
-            let (_collection_name, _token_name_base, _collection_maximum, _token_maximum, _already_mint,
-                _quantity,
-            ) = dat3_invitation_nft::collection_config();
+
             move_to(&sig, FidStore {
-                collection: _collection_name,
                 data: simple_map::create<u64, FidReward>(),
+            }) ;
+            move_to(&sig, CheckInvitees {
+                users: bucket_table::new<address, u64>(200),
             })
         };
     }
@@ -106,9 +110,9 @@ module dat3_owner::invitation_reward {
         dat3_routel: &signer,
         fid: u64,
         user: address
-    ) acquires FidStore
+    ) acquires FidStore, CheckInvitees
     {
-        assert!(signer::address_of(dat3_routel) == @dat3_routel, error::permission_denied(PERMISSION_DENIED));
+        assert!(signer::address_of(dat3_routel) == @dat3_reward, error::permission_denied(PERMISSION_DENIED));
 
 
         let f = borrow_global_mut<FidStore>(@dat3_nft_reward);
@@ -128,9 +132,9 @@ module dat3_owner::invitation_reward {
         };
         let fr = simple_map::borrow_mut(&mut f.data, &fid);
         //todo Consider turning "contains" into views
-        if (!vector::contains(&mut fr.users, &user)) {
-            vector::push_back(&mut fr.users, user);
-        };
+        let check = borrow_global_mut<CheckInvitees>(@dat3_nft_reward);
+        bucket_table::add(&mut check.users, user, fid);
+        vector::push_back(&mut fr.users, user);
     }
 
     #[view]
@@ -146,23 +150,20 @@ module dat3_owner::invitation_reward {
     }
 
     #[view]
-    public fun is_invitee(fid: u64, user: address): (u64) acquires FidStore
+    public fun is_invitee(user: address): u64 acquires CheckInvitees
     {
-        assert!(exists<FidStore>(@dat3_nft_reward), error::not_found(NOT_FOUND));
-        let f = borrow_global<FidStore>(@dat3_nft_reward);
-        if (simple_map::contains_key(&f.data, &fid)) {
-            if (vector::contains(&simple_map::borrow(&f.data, &fid).users, &user)) {
-                return 1
-            };
-            return 2
+        assert!(exists<CheckInvitees>(@dat3_nft_reward), error::not_found(NOT_FOUND));
+        let check = borrow_global_mut<CheckInvitees>(@dat3_nft_reward);
+
+        if (bucket_table::contains(&check.users, &user)) {
+            return *bucket_table::borrow(&mut check.users, user)
         } ;
-        return 3
+        return 0
     }
 
 
-    fun
-    new_token_name(i: u64):
-    String
+    fun new_token_name(i: u64)
+    : String
     {
         let name = string::utf8(b"");
         if (i >= 1000) {
