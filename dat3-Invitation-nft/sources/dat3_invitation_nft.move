@@ -437,22 +437,13 @@ module dat3_owner::dat3_invitation_nft {
     #[test(dat3 = @dat3_owner)]
     fun test_resource_account(dat3: &signer)
     {
-        let (_, _sig1) = account::create_resource_account(dat3, b"dat3_v1");
-        let (_, _sig2) = account::create_resource_account(dat3, b"dat3_pool_v1");
-        let (_, _sig3) = account::create_resource_account(dat3, b"dat3_routel_v1");
-        let (_, _sig4) = account::create_resource_account(dat3, b"dat3_stake_v1");
-        let (_, _sig5) = account::create_resource_account(dat3, b"dat3_nft_v1");
+        let (_, _sig1) = account::create_resource_account(dat3, b"dat3_nft_v1");
+        let (_, _sig2) = account::create_resource_account(dat3, b"dat3_nft_reward_v1");
         let _sig1 = account::create_signer_with_capability(&_sig1);
         let _sig2 = account::create_signer_with_capability(&_sig2);
-        let _sig3 = account::create_signer_with_capability(&_sig3);
-        let _sig4 = account::create_signer_with_capability(&_sig4);
-        let _sig5 = account::create_signer_with_capability(&_sig5);
         debug::print(&signer::address_of(dat3));
         debug::print(&signer::address_of(&_sig1));
         debug::print(&signer::address_of(&_sig2));
-        debug::print(&signer::address_of(&_sig3));
-        debug::print(&signer::address_of(&_sig4));
-        debug::print(&signer::address_of(&_sig5));
     }
 
     #[test(dat3 = @dat3_owner, to = @dat3_nft, fw = @aptos_framework)]
@@ -525,7 +516,6 @@ module dat3_owner::dat3_invitation_nft {
         mint_tokens(dat3,   500, ) ;
         mint(to);
         //mint_tokens(dat3, string::utf8(c_name), 100, );
-        let c = borrow_global<CollectionConfig>(@dat3_nft);
 
         let i = 1u64;
         while (i <= count) {
