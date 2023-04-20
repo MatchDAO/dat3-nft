@@ -4,31 +4,30 @@ module dat3_owner::invitation_reward {
     use std::string::{Self, String, utf8};
     use std::vector;
 
-    use aptos_std::simple_map::{Self, SimpleMap};
-    use aptos_framework::account;
+    use aptos_std::smart_table::{Self, SmartTable};
+    use aptos_std::smart_vector::{Self, SmartVector};
+    use aptos_framework::account::{Self, SignerCapability};
     use aptos_framework::coin::{Self, Coin};
 
     use aptos_token::token;
+
     use dat3_owner::dat3_invitation_nft;
-    use aptos_framework::account::SignerCapability;
-    use dat3_owner::bucket_table;
-    use dat3_owner::bucket_table::BucketTable;
 
     struct FidStore has key, store {
-        data: SimpleMap<u64, FidReward>,
+        data: SmartTable<u64, FidReward>,
     }
 
     struct FidReward has key, store {
         fid: u64,
         spend: u64,
         earn: u64,
-        users: vector<address>,
+        users: SmartVector<address>,
         claim: u64,
         amount: Coin<0x1::aptos_coin::AptosCoin>,
     }
 
     struct CheckInvitees has key, store {
-        users: BucketTable<address, u64>,
+        users: SmartTable<address, u64>,
     }
 
     struct FidRewardSin has key {
@@ -59,7 +58,7 @@ module dat3_owner::invitation_reward {
             token,
             0
         );
-        let fid_r = simple_map::borrow_mut(&mut f_s.data, &fid);
+        let fid_r = smart_table::borrow_mut(&mut f_s.data, fid);
         if (token::balance_of(addr, token_id) > 0 && coin::value(&fid_r.amount) > 0) {
             coin::deposit(addr, coin::extract_all(&mut fid_r.amount));
             fid_r.claim = fid_r.claim + coin::value(&fid_r.amount);
@@ -77,8 +76,8 @@ module dat3_owner::invitation_reward {
         assert!(signer::address_of(dat3_reward) == @dat3_reward, error::permission_denied(PERMISSION_DENIED));
         let f = borrow_global_mut<FidStore>(@dat3_nft_reward);
         //aborted transaction,coins are safe
-        assert!(simple_map::contains_key(&f.data, &fid), error::not_found(NOT_FOUND));
-        let fr = simple_map::borrow_mut(&mut f.data, &fid);
+        assert!(smart_table::contains(&f.data, fid), error::not_found(NOT_FOUND));
+        let fr = smart_table::borrow_mut(&mut f.data, fid);
         let val = coin::value(&amount);
         if (is_spend) {
             fr.spend = fr.spend + val;
@@ -98,10 +97,10 @@ module dat3_owner::invitation_reward {
             let sig = account::create_signer_with_capability(&borrow_global<FidRewardSin>(@dat3_nft_reward).sinCap);
 
             move_to(&sig, FidStore {
-                data: simple_map::create<u64, FidReward>(),
+                data: smart_table::new<u64, FidReward>(),
             }) ;
             move_to(&sig, CheckInvitees {
-                users: bucket_table::new<address, u64>(200),
+                users: smart_table::new<address, u64>(),
             })
         };
     }
@@ -120,31 +119,70 @@ module dat3_owner::invitation_reward {
             _quantity,
         ) = dat3_invitation_nft::collection_config();
         assert!(fid <= _already_mint && fid > 0, error::invalid_argument(NOT_FOUND));
-        if (!simple_map::contains_key(&f.data, &fid)) {
-            simple_map::add(&mut f.data, fid, FidReward {
+        if (!smart_table::contains(&f.data, fid)) {
+            smart_table::add(&mut f.data, fid, FidReward {
                 fid,
                 spend: 0,
                 earn: 0,
-                users: vector::empty<address>(),
+                users: smart_vector::empty<address>(),
                 claim: 0,
                 amount: coin::zero<0x1::aptos_coin::AptosCoin>(),
             })
         };
-        let fr = simple_map::borrow_mut(&mut f.data, &fid);
+        let fr = smart_table::borrow_mut(&mut f.data, fid);
         //todo Consider turning "contains" into views
         let check = borrow_global_mut<CheckInvitees>(@dat3_nft_reward);
-        bucket_table::add(&mut check.users, user, fid);
-        vector::push_back(&mut fr.users, user);
+        smart_table::add(&mut check.users, user, fid);
+        smart_vector::push_back(&mut fr.users, user);
     }
 
     #[view]
-    public fun fid_reward(fid: u64): (u64, u64, u64, u64, vector<address>, u64, ) acquires FidStore
+    public fun fid_reward(
+        fid: u64,
+        page: u64,
+        size: u64
+    ): (u64, u64, u64, u64, vector<address>, u64, ) acquires FidStore
     {
         assert!(exists<FidStore>(@dat3_nft_reward), error::not_found(NOT_FOUND));
         let f = borrow_global<FidStore>(@dat3_nft_reward);
-        if (simple_map::contains_key(&f.data, &fid)) {
-            let fr = simple_map::borrow(&f.data, &fid);
-            return (fr.fid, coin::value(&fr.amount), fr.spend, fr.earn, fr.users, fr.claim)
+        if (smart_table::contains(&f.data, fid)) {
+            let fr = smart_table::borrow(&f.data, fid);
+            let total = smart_vector::length(&fr.users);
+            if (size == 0 || size > 1000) {
+                size = 100;
+            };
+            if (page == 0) {
+                page = 1;
+            };
+            //the last page
+            if (total % size > 0 && page - 1 > (total / size)) {
+                page = total / size + 1;
+            };
+            //begin~end curr=end
+            let curr = 0u64;
+            if (total < size * page) {
+                curr = total;
+            }else {
+                curr = size * page;
+            } ;
+            //begin~end begin
+            let begin = 0u64;
+            if (curr - size > 0) {
+                begin = curr - size;
+                //the last page
+                if (total % size > 0 && page - 1 == (total / size)) {
+                    begin = curr - (total % size);
+                };
+            }else {
+                begin = 0;
+            };
+            let users = vector::empty<address>();
+            while (begin < curr) {
+                let addr = smart_vector::borrow(&fr.users, begin);
+                vector::push_back(&mut users, *addr);
+                begin = begin + 1;
+            };
+            return (fr.fid, coin::value(&fr.amount), fr.spend, fr.earn, users, fr.claim)
         };
         return (fid, 0, 0, 0, vector::empty<address>(), 0)
     }
@@ -155,9 +193,9 @@ module dat3_owner::invitation_reward {
         assert!(exists<CheckInvitees>(@dat3_nft_reward), error::not_found(NOT_FOUND));
         let check = borrow_global_mut<CheckInvitees>(@dat3_nft_reward);
 
-        if (bucket_table::contains(&check.users, &user)) {
-            return *bucket_table::borrow(&mut check.users, user)
-        } ;
+        if (smart_table::contains(&check.users, user)) {
+            return *smart_table::borrow(&mut check.users, user)
+        };
         return 0
     }
 
