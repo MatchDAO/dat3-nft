@@ -5,6 +5,7 @@ upgrade_policy = "compatible"
 [dependencies]
 # # https://github.com/aptos-labs/aptos-core.git
 AptosFramework = { local = "../../aptos-core-mainnet/aptos-move/framework/aptos-framework" }
+AptosStdlib = { local = "../../aptos-core-mainnet/aptos-move/framework/aptos-stdlib" }
 AptosToken = { local = "../../aptos-core-mainnet/aptos-move/framework/aptos-token" }
 [addresses]
 std = "0x1"
