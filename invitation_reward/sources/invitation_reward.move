@@ -41,6 +41,17 @@ module dat3_owner::invitation_reward {
     const ALREADY_ENDED: u64 = 121u64;
     const NO_QUOTA: u64 = 122u64;
 
+    public entry fun mint(account: &signer)
+    {
+       dat3_invitation_nft::mint(account)
+    }
+
+    #[view]
+    public fun mint_state(addr: address)
+    : (u64, u64, u64, u64, u64, u64, bool, u64, vector<String>)
+    {
+        dat3_invitation_nft::mint_state(addr)
+    }
     //Everyone can initiate, provided they have this nft
     public entry fun claim_invite_reward(account: &signer, fid: u64) acquires FidStore
     {
@@ -97,21 +108,21 @@ module dat3_owner::invitation_reward {
             let sig = account::create_signer_with_capability(&borrow_global<FidRewardSin>(@dat3_nft_reward).sinCap);
 
             move_to(&sig, FidStore {
-                data: smart_table::new<u64, FidReward>(),
+                data: smart_table::new_with_config<u64, FidReward>(5, 75, 200),
             }) ;
             move_to(&sig, CheckInvitees {
-                users: smart_table::new<address, u64>(),
+                users: smart_table::new_with_config<address, u64>(5, 75, 200),
             })
         };
     }
 
     public fun add_invitee(
-        dat3_routel: &signer,
+        dat3_reward: &signer,
         fid: u64,
         user: address
     ) acquires FidStore, CheckInvitees
     {
-        assert!(signer::address_of(dat3_routel) == @dat3_reward, error::permission_denied(PERMISSION_DENIED));
+        assert!(signer::address_of(dat3_reward) == @dat3_reward, error::permission_denied(PERMISSION_DENIED));
 
 
         let f = borrow_global_mut<FidStore>(@dat3_nft_reward);
@@ -132,6 +143,7 @@ module dat3_owner::invitation_reward {
         let fr = smart_table::borrow_mut(&mut f.data, fid);
         //todo Consider turning "contains" into views
         let check = borrow_global_mut<CheckInvitees>(@dat3_nft_reward);
+
         smart_table::add(&mut check.users, user, fid);
         smart_vector::push_back(&mut fr.users, user);
     }
@@ -141,7 +153,7 @@ module dat3_owner::invitation_reward {
         fid: u64,
         page: u64,
         size: u64
-    ): (u64, u64, u64, u64, vector<address>, u64, ) acquires FidStore
+    ): (u64, u64, u64, u64, vector<address>, u64, u64, ) acquires FidStore
     {
         assert!(exists<FidStore>(@dat3_nft_reward), error::not_found(NOT_FOUND));
         let f = borrow_global<FidStore>(@dat3_nft_reward);
@@ -159,32 +171,32 @@ module dat3_owner::invitation_reward {
                 page = total / size + 1;
             };
             //begin~end curr=end
-            let curr = 0u64;
+            let _curr = 0u64;
             if (total < size * page) {
-                curr = total;
+                _curr = total;
             }else {
-                curr = size * page;
+                _curr = size * page;
             } ;
             //begin~end begin
-            let begin = 0u64;
-            if (curr - size > 0) {
-                begin = curr - size;
+            let _begin = 0u64;
+            if (_curr - size > 0) {
+                _begin = _curr - size;
                 //the last page
                 if (total % size > 0 && page - 1 == (total / size)) {
-                    begin = curr - (total % size);
+                    _begin = _curr - (total % size);
                 };
             }else {
-                begin = 0;
+                _begin = 0;
             };
             let users = vector::empty<address>();
-            while (begin < curr) {
-                let addr = smart_vector::borrow(&fr.users, begin);
+            while (_begin < _curr) {
+                let addr = smart_vector::borrow(&fr.users, _begin);
                 vector::push_back(&mut users, *addr);
-                begin = begin + 1;
+                _begin = _begin + 1;
             };
-            return (fr.fid, coin::value(&fr.amount), fr.spend, fr.earn, users, fr.claim)
+            return (fr.fid, coin::value(&fr.amount), fr.spend, fr.earn, users,total, fr.claim)
         };
-        return (fid, 0, 0, 0, vector::empty<address>(), 0)
+        return (fid, 0, 0, 0, vector::empty<address>(), 0,0)
     }
 
     #[view]

@@ -113,7 +113,7 @@ module dat3_owner::dat3_invitation_nft {
                 token_maximum,
                 token_mutate_config: create_token_mutability_config(&token_mutate_config),
                 already_mint: 0u64, //big::empty<u64>(),
-                whitelist: smart_table::new<address, vector<u64>>(), //simple_map::create<address, vector<u64>>(),
+                whitelist: smart_table::new_with_config<address, vector<u64>>(5, 75, 200), //simple_map::create<address, vector<u64>>(),
                 quantity: 0u64,
                 whitelist_mint_config: WhitelistMintConfig {
                     price: 0u64,
@@ -426,6 +426,7 @@ module dat3_owner::dat3_invitation_nft {
         debug::print(&signer::address_of(dat3));
         debug::print(&signer::address_of(&_sig1));
         debug::print(&signer::address_of(&_sig2));
+        debug::print(&utf8(b"ni12"));
     }
 
     #[test(dat3 = @dat3_owner, to = @dat3_nft, fw = @aptos_framework)]
