@@ -12,6 +12,8 @@ module dat3_owner::invitation_reward {
     use aptos_token::token;
 
     use dat3_owner::dat3_invitation_nft;
+    #[test_only]
+    use aptos_std::debug;
 
     struct FidStore has key, store {
         data: SmartTable<u64, FidReward>,
@@ -43,7 +45,7 @@ module dat3_owner::invitation_reward {
 
     public entry fun mint(account: &signer)
     {
-       dat3_invitation_nft::mint(account)
+        dat3_invitation_nft::mint(account)
     }
 
     #[view]
@@ -52,6 +54,7 @@ module dat3_owner::invitation_reward {
     {
         dat3_invitation_nft::mint_state(addr)
     }
+
     //Everyone can initiate, provided they have this nft
     public entry fun claim_invite_reward(account: &signer, fid: u64) acquires FidStore
     {
@@ -143,9 +146,10 @@ module dat3_owner::invitation_reward {
         let fr = smart_table::borrow_mut(&mut f.data, fid);
         //todo Consider turning "contains" into views
         let check = borrow_global_mut<CheckInvitees>(@dat3_nft_reward);
-
-        smart_table::add(&mut check.users, user, fid);
-        smart_vector::push_back(&mut fr.users, user);
+        if (!smart_table::contains(&mut check.users, user, )) {
+            smart_table::add(&mut check.users, user, fid);
+            smart_vector::push_back(&mut fr.users, user);
+        }
     }
 
     #[view]
@@ -179,7 +183,7 @@ module dat3_owner::invitation_reward {
             } ;
             //begin~end begin
             let _begin = 0u64;
-            if (_curr - size > 0) {
+            if (_curr > size) {
                 _begin = _curr - size;
                 //the last page
                 if (total % size > 0 && page - 1 == (total / size)) {
@@ -196,17 +200,17 @@ module dat3_owner::invitation_reward {
             };
             return (fr.fid, coin::value(&fr.amount), fr.spend, fr.earn, users,total, fr.claim)
         };
-        return (fid, 0, 0, 0, vector::empty<address>(), 0,0)
+        return (fid, 0, 0, 0, vector::empty<address>(), 0, 0)
     }
 
     #[view]
     public fun is_invitee(user: address): u64 acquires CheckInvitees
     {
         assert!(exists<CheckInvitees>(@dat3_nft_reward), error::not_found(NOT_FOUND));
-        let check = borrow_global_mut<CheckInvitees>(@dat3_nft_reward);
+        let check = borrow_global<CheckInvitees>(@dat3_nft_reward);
 
         if (smart_table::contains(&check.users, user)) {
-            return *smart_table::borrow(&mut check.users, user)
+            return *smart_table::borrow(&check.users, user)
         };
         return 0
     }
@@ -242,5 +246,39 @@ module dat3_owner::invitation_reward {
         };
         vector::reverse(&mut buffer);
         utf8(buffer)
+    }
+
+    #[test(dat3_owner = @dat3_owner, to = @dat3_nft, fw = @aptos_framework, dat3 = @dat3)]
+    fun test_resource_account(dat3_owner: &signer, to: &signer, fw: &signer, dat3: &signer, )
+    acquires FidStore, CheckInvitees, FidRewardSin {
+        let (_, _sig1) = account::create_resource_account(dat3, b"dat3_pool_v1");
+        let (_, _sig2) = account::create_resource_account(dat3, b"dat3_reward_v1");
+        let (_, _sig3) = account::create_resource_account(dat3, b"dat3_stake_v1");
+        let (_, _sig4) = account::create_resource_account(dat3, b"dat3_v1");
+        let (_, _sig5) = account::create_resource_account(dat3, b"dat3_payment_v1");
+        let _sig1 = account::create_signer_with_capability(&_sig1);
+        let _sig2 = account::create_signer_with_capability(&_sig2);
+        let _sig3 = account::create_signer_with_capability(&_sig3);
+        let _sig4 = account::create_signer_with_capability(&_sig4);
+        let _sig5 = account::create_signer_with_capability(&_sig5);
+        dat3_invitation_nft::dat3_nft_init(dat3_owner, to, fw);
+
+        init(dat3_owner);
+        add_invitee(&_sig2, 1, @dat3_reward);
+        add_invitee(&_sig2, 1, @dat3_owner);
+        add_invitee(&_sig2, 1, @dat3_payment);
+        add_invitee(&_sig2, 1, @dat3_nft_reward);
+
+        dat3_invitation_nft::whitelist(dat3_owner, vector::singleton(@dat3_reward), 0, 0, 0, 0);
+        debug::print(&is_invitee(@dat3_reward));
+        debug::print(&utf8(b"------------------------------"));
+        let (_v1, _v2, _v3, _v4, _v5, _v6, _v7, ) = fid_reward(1, 2, 2);
+        debug::print(&_v1);
+        debug::print(&_v2);
+        debug::print(&_v3);
+        debug::print(&_v4);
+        debug::print(&_v5);
+        debug::print(&_v6);
+        debug::print(&_v7);
     }
 }

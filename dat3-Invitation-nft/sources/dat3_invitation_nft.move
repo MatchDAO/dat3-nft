@@ -376,7 +376,7 @@ module dat3_owner::dat3_invitation_nft {
         //let already_mint = vector::empty<u64>();
         let _already_mint = 0u64;
 
-        let cnf = borrow_global_mut<CollectionConfig>(@dat3_nft);
+        let cnf = borrow_global<CollectionConfig>(@dat3_nft);
         _collection_maximum = cnf.collection_maximum;
         _quantity = cnf.quantity;
         //in_whitelist = simple_map::contains_key(&cnf.whitelist, &addr);
@@ -387,10 +387,10 @@ module dat3_owner::dat3_invitation_nft {
         _start_time = cnf.whitelist_mint_config.start_time;
         if (_in_whitelist) {
             // mint_num = vector::length(simple_map::borrow(&cnf.whitelist, &addr));
-            _mint_num = vector::length(smart_table::borrow(&mut cnf.whitelist, addr));
+            _mint_num = vector::length(smart_table::borrow(& cnf.whitelist, addr));
             let i = 0u64;
             while (i < _mint_num) {
-                let code = vector::borrow(smart_table::borrow(&mut cnf.whitelist, addr), i);
+                let code = vector::borrow(smart_table::borrow(& cnf.whitelist, addr), i);
                 let name = new_token_name(*code);
                 let token_name = cnf.token_name_base;
                 string::append(&mut token_name, name, );
@@ -429,8 +429,9 @@ module dat3_owner::dat3_invitation_nft {
         debug::print(&utf8(b"ni12"));
     }
 
-    #[test(dat3 = @dat3_owner, to = @dat3_nft, fw = @aptos_framework)]
-    fun dat3_nft_init(
+    #[test_only(dat3 = @dat3_owner, to = @dat3_nft, fw = @aptos_framework)]
+    // #[test(dat3 = @dat3_owner, to = @dat3_nft, fw = @aptos_framework)]
+    public fun dat3_nft_init(
         dat3: &signer, to: &signer, fw: &signer
     ) acquires
     CollectionSin, CollectionConfig
