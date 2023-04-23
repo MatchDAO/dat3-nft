@@ -603,6 +603,27 @@ module dat3_owner::dat3_invitation_nft {
         let c = borrow_global_mut<CollectionConfig>(@dat3_nft);
         debug::print(&c.whitelist);
     }
+    #[view]
+    public fun mint_state_s(addr: address)
+    : (u64, u64, u64, u64, u64, u64, bool, u64, vector<u64>)
+    // acquires CollectionConfig
+    {
+        let _in_whitelist = false;
+        let _mint_num = 0u64;
+        let _mint_nft = vector::empty<u64>();
+        let _collection_maximum = 0u64;
+        let _quantity = 0u64;
+        let _price = 0u64;
+        let _end_time = 0u64;
+        let _start_time = 0u64;
+        //let already_mint = vector::empty<u64>();
+        let _already_mint = 0u64;
+        let _ =addr;
+        return (_collection_maximum, _quantity, _price, _start_time, _end_time, _already_mint,
+            _in_whitelist,
+            _mint_num,
+            _mint_nft)
+    }
 
 
     fun u64_to_string(value: u64)
