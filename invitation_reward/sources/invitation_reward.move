@@ -90,15 +90,19 @@ module dat3_owner::invitation_reward {
         assert!(signer::address_of(dat3_reward) == @dat3_reward, error::permission_denied(PERMISSION_DENIED));
         let f = borrow_global_mut<FidStore>(@dat3_nft_reward);
         //aborted transaction,coins are safe
-        assert!(smart_table::contains(&f.data, fid), error::not_found(NOT_FOUND));
-        let fr = smart_table::borrow_mut(&mut f.data, fid);
-        let val = coin::value(&amount);
-        if (is_spend) {
-            fr.spend = fr.spend + val;
-        }else {
-            fr.earn = fr.earn + val;
-        };
-        coin::merge(&mut fr.amount, amount);
+        if (smart_table::contains(&f.data, fid)) {
+            let fr = smart_table::borrow_mut(&mut f.data, fid);
+            let val = coin::value(&amount);
+            if (is_spend) {
+                fr.spend = fr.spend + val;
+            }else {
+                fr.earn = fr.earn + val;
+            };
+            coin::merge(&mut fr.amount, amount);
+        }else{
+            coin::deposit(@dat3,amount)
+        }
+
     }
 
     public entry fun init(dat3_owner: &signer, ) acquires FidRewardSin {
@@ -116,7 +120,7 @@ module dat3_owner::invitation_reward {
             move_to(&sig, CheckInvitees {
                 users: smart_table::new_with_config<address, u64>(5, 75, 200),
             })
-        };
+        }
     }
 
     public fun add_invitee(
@@ -198,7 +202,7 @@ module dat3_owner::invitation_reward {
                 vector::push_back(&mut users, *addr);
                 _begin = _begin + 1;
             };
-            return (fr.fid, coin::value(&fr.amount), fr.spend, fr.earn, users,total, fr.claim)
+            return (fr.fid, coin::value(&fr.amount), fr.spend, fr.earn, users, total, fr.claim)
         };
         return (fid, 0, 0, 0, vector::empty<address>(), 0, 0)
     }
